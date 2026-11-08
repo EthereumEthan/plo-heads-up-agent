@@ -1,0 +1,31 @@
+{
+  "bot": "main",
+  "source": "fix/candB (latest + size-aware defense, half-pot sizing, position knobs)",
+  "params": {
+    "open_thr": 0.30359687353064846,
+    "raise_thr_0": 0.637641401800008,
+    "raise_thr_1": 0.58,
+    "raise_thr_2": 0.5001265103693414,
+    "raise_thr_3": 0.58,
+    "call_margin_0": -0.046077841031398406,
+    "call_margin_1": 0.14982726350320025,
+    "call_margin_2": -0.013312918129535667,
+    "call_margin_3": -0.09851862101886281,
+    "bluff_freq_1": 0.42,
+    "bluff_freq_2": 0.45,
+    "bluff_freq_3": 0.2,
+    "bet_frac_value": 0.55,
+    "bet_frac_bluff": 0.5,
+    "trap_freq": 0.0020673677664588123,
+    "max_raises": 2.173532292785609,
+    "reraise_thr": 0.9348157007854193,
+    "exploit_strength": 0.8385284309559863,
+    "range_tighten_k": 0.6371092427235204,
+    "exp3_gamma": 0.037152414510162914,
+    "size_disc": 0.25,
+    "small_raise_w": 0.4,
+    "pot_size_thr": 0.85,
+    "ip_bluff_mult": 1.6,
+    "ip_raise_adj": -0.03
+  }
+}
