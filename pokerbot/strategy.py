@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from pokerbot.opponent import OpponentView
+from pokerbot.opponent import OpponentView, raise_fractions
 from pokerbot.types import Action, Observation
 
 
@@ -40,28 +40,32 @@ def bet_fraction(obs: Observation) -> float:
 
 def opp_raise_fractions(obs: Observation) -> list[float]:
     """For each opponent raise in this hand, its size as a fraction of the pot after the call (0.5 = official RAISE_HALF, 1.0 = RAISE_POT)."""
-    cfg = obs.config
-    bets = [cfg.small_blind, cfg.big_blind]  # seat 0 is the button / small blind
-    pot = cfg.small_blind + cfg.big_blind
-    street = 0
-    out: list[float] = []
-    for r in obs.history:
-        if r.street != street:
-            street = r.street
-            bets = [0, 0]
-        me, other = r.seat, 1 - r.seat
-        if r.action.kind == "call":
-            pot += bets[other] - bets[me]
-            bets[me] = bets[other]
-        elif r.action.kind == "raise":
-            to_call = max(bets[other] - bets[me], 0)
-            inc = r.action.amount - bets[other]
-            after_call = pot + to_call
-            if r.seat != obs.seat:
-                out.append(inc / after_call if after_call > 0 else 1.0)
-            pot += r.action.amount - bets[me]
-            bets[me] = r.action.amount
-    return out
+    fr = raise_fractions(obs.history, obs.config.small_blind, obs.config.big_blind)
+    return [fr[i] for i, r in enumerate(obs.history) if i in fr and r.seat != obs.seat]
+
+
+def ev_raise_to(obs: Observation, equity: float, opp: OpponentView, ex: float, bluff: bool) -> int:
+    """Pick half-pot or pot by one-street expected value against the opponent's size-specific fold rates.
+
+    EV(b) = P(fold) * pot + (1 - P(fold)) * (eq_call * (pot + 2b) - b), with eq_call the equity
+    once the opponent continues (a bluff's equity shrinks, a value hand's a little). Fold rates are
+    shrunk toward the street's overall fold-to-bet by (1 - ex).
+    """
+    legal = obs.legal
+    pot_after_call = obs.pot + legal.call_amount
+    best_to, best_ev = int(legal.raise_half_to), -1e9
+    for to in legal.raise_targets():
+        b = to - obs.opp_street_bet  # chips we add beyond the call
+        if b <= 0:
+            continue
+        frac = b / pot_after_call if pot_after_call > 0 else 1.0
+        size_rate = opp.fold_to_half if frac < 0.75 else opp.fold_to_pot
+        p_fold = (1 - ex) * opp.fold_to_bet + ex * size_rate
+        eq_call = equity * (0.75 if bluff else 0.92)
+        ev = p_fold * pot_after_call + (1 - p_fold) * (eq_call * (pot_after_call + 2 * b) - b)
+        if ev > best_ev:
+            best_ev, best_to = ev, int(to)
+    return best_to
 
 
 def decide(
@@ -115,6 +119,8 @@ def decide(
             return Decision(Action("call"), equity, "trap")
         if equity >= params["pot_size_thr"]:
             amount = int(legal.raise_pot_to)
+        elif params["ev_sizing"] >= 0.5:
+            amount = ev_raise_to(obs, equity, opp, ex, bluff=False)
         else:
             amount = choose_raise_to(obs, params["bet_frac_value"], rng)
         return Decision(Action("raise", amount), equity, "value")
@@ -122,7 +128,10 @@ def decide(
     # Free check or bluff
     if to_call == 0:
         if s >= 1 and legal.can_raise and rng.random() < bluff_freq:
-            amount = choose_raise_to(obs, params["bet_frac_bluff"], rng)
+            if params["ev_sizing"] >= 0.5:
+                amount = ev_raise_to(obs, equity, opp, ex, bluff=True)
+            else:
+                amount = choose_raise_to(obs, params["bet_frac_bluff"], rng)
             return Decision(Action("raise", amount), equity, "bluff")
         return Decision(Action("check"), equity, "check")
 

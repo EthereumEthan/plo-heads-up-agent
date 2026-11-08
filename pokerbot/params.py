@@ -25,6 +25,7 @@ PARAM_SPACE: dict[str, tuple[float, float, float]] = {
     "pot_size_thr":     (1.00, 0.70, 1.00),  # value bets at or above this equity are always pot sized (1.0 = off)
     "ip_bluff_mult":    (1.00, 0.50, 2.00),  # multiply bluff frequency when in position (button, postflop)
     "ip_raise_adj":     (0.00, -0.10, 0.05), # add to raise threshold when in position (negative = bet more in position)
+    "ev_sizing":        (0.00, 0.00, 1.00),  # >= 0.5: pick half/pot by one-street EV vs the opponent's size-specific fold rates
 }
 
 
